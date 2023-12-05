@@ -42,7 +42,7 @@ variable "FUNMAN_DEV_GID" {
 
 function "tag" {
   params = [image_name, prefix, suffix]
-  result = [ "${DOCKER_REGISTRY}/${DOCKER_ORG}/${image_name}:${check_prefix(prefix)}${VERSION}${check_suffix(suffix)}" ]
+  result = ["${DOCKER_REGISTRY}/${DOCKER_ORG}/${image_name}:${check_prefix(prefix)}${VERSION}${check_suffix(suffix)}"]
 }
 
 function "check_prefix" {
@@ -54,6 +54,13 @@ function "check_suffix" {
   params = [tag]
   result = notequal("",tag) ? "-${tag}": ""
 }
+
+function "compose_registry" {
+  params = [registry, org]
+  result = notequal("localhost", registry) ? "${registry}/${org}/" : "${registry}/${org}/"
+}
+
+# ----------------------------------------------------------------------------------------------------------------------
 
 target "funman-ibex" {
   context = "./docker/ibex"
@@ -70,7 +77,7 @@ target "funman-dreal4" {
     "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}" = "target:funman-ibex"
   }
   args = {
-    SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
+    SIFT_REGISTRY_ROOT = compose_registry("${DOCKER_REGISTRY}","${DOCKER_ORG}")
     IBEX_TAG = "${VERSION}"
     TARGETOS = "${TARGET_OS}"
     TARGETARCH = "${TARGET_ARCH}"
@@ -175,4 +182,37 @@ target "funman-dev-as-root" {
   }
   dockerfile = "./docker/dev/root/Dockerfile.root"
   tags = tag("funman-dev", "", "")
+}
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+target "_platforms" {
+  platforms = ["linux/amd64"]
+}
+target "funman-ibex-multiplatform" {
+  inherits = ["_platforms", "funman-ibex"]
+}
+target "funman-dreal4-multiplatform" {
+  inherits = ["_platforms", "funman-dreal4"]
+  contexts = {
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}" = "target:funman-ibex-multiplatform"
+  }
+}
+target "funman-base-multiplatform" {
+  inherits = ["_platforms", "funman-base"]
+  contexts = {
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}" = "target:funman-dreal4-multiplatform"
+  }
+}
+target "funman-git-multiplatform" {
+  inherits = ["_platforms", "funman-git"]
+  contexts = {
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}" = "target:funman-base-multiplatform"
+  }
+}
+target "funman-api-multiplatform" {
+  inherits = ["_platforms", "funman-api"]
+  contexts = {
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}" = "target:funman-git-multiplatform"
+  }
 }

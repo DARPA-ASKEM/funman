@@ -64,7 +64,7 @@ jobs:
         with:
           files: |
             ./docker/docker-bake.hcl
-          targets: funman-api
+          targets: funman-api-multiplatform
           push: true
           sbom: false
           provenance: false
