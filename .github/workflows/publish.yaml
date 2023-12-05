@@ -66,6 +66,8 @@ jobs:
             ./docker/docker-bake.hcl
           targets: funman-api
           push: true
+          sbom: false
+          provenance: false
           set: |
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
