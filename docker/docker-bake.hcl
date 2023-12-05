@@ -55,24 +55,6 @@ function "check_suffix" {
   result = notequal("",tag) ? "-${tag}": ""
 }
 
-# ----------------------------------------------------------------------------------------------------------------------
-
-group "api" {
-  targets = [
-    "funman-ibex",
-    "funman-dreal4",
-    "funman-base",
-    "funman-git",
-    "funman-api"
-  ]
-}
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-target "_platforms" {
-  platforms = ["linux/amd64"]
-}
-
 target "funman-ibex" {
   context = "./docker/ibex"
   args = {
@@ -193,32 +175,4 @@ target "funman-dev-as-root" {
   }
   dockerfile = "./docker/dev/root/Dockerfile.root"
   tags = tag("funman-dev", "", "")
-}
-
-target "funman-ibex-multiplatform" {
-  inherits = ["_platforms", "funman-ibex"]
-}
-target "funman-dreal4-multiplatform" {
-  inherits = ["_platforms", "funman-dreal4"]
-  contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}" = "target:funman-ibex-multiplatform"
-  }
-}
-target "funman-base-multiplatform" {
-  inherits = ["_platforms", "funman-base"]
-  contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}" = "target:funman-dreal4-multiplatform"
-  }
-}
-target "funman-git-multiplatform" {
-  inherits = ["_platforms", "funman-git"]
-  contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}" = "target:funman-base-multiplatform"
-  }
-}
-target "funman-api-multiplatform" {
-  inherits = ["_platforms", "funman-api"]
-  contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}" = "target:funman-git-multiplatform"
-  }
 }
