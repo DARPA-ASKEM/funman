@@ -10,8 +10,11 @@ variable "VERSION" {
 variable "IBEX_BRANCH" {
   default = "ibex-2.8.5_using_mathlib-2.1.1"
 }
-variable "DEBUG_IBEX" {
-  default = "no"
+variable "TARGET_OS" {
+  default = "linux"
+}
+variable "TARGET_ARCH" {
+  default = "amd64"
 }
 variable "BAZEL_VERSION" {
   default = "6.0.0"
@@ -52,19 +55,16 @@ function "check_suffix" {
   result = notequal("",tag) ? "-${tag}": ""
 }
 
-function "compose_registry" {
-  params = [registry, org]
-  result = notequal("localhost", registry) ? "${registry}/${org}/" : "${registry}/${org}/"
-}
-
 # ----------------------------------------------------------------------------------------------------------------------
 
-group "multiplatform-api" {
-  targets = ["funman-ibex-multiplatform",
-             "funman-dreal4-multiplatform",
-             "funman-base-multiplatform",
-             "funman-git-multiplatform",
-             "funman-api-multiplatform"]
+group "api" {
+  targets = [
+    "funman-ibex",
+    "funman-dreal4",
+    "funman-base",
+    "funman-git",
+    "funman-api"
+  ]
 }
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -77,50 +77,55 @@ target "funman-ibex" {
   context = "./docker/ibex"
   args = {
     IBEX_BRANCH = "${IBEX_BRANCH}"
-    ENABLE_DEBUG = "${DEBUG_IBEX}"
   }
   dockerfile = "Dockerfile"
-  tags = tag("funman-ibex", "", "${IBEX_BRANCH}")
+  tags = tag("funman-ibex", "", "")
 }
 
 target "funman-dreal4" {
   context = "./docker/dreal4"
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}-${IBEX_BRANCH}" = "target:funman-ibex"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}" = "target:funman-ibex"
   }
   args = {
-    SIFT_REGISTRY_ROOT = compose_registry("${DOCKER_REGISTRY}","${DOCKER_ORG}")
-    IBEX_TAG = "${VERSION}-${IBEX_BRANCH}"
+    SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
+    IBEX_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
     BAZEL_VERSION = "${BAZEL_VERSION}"
     DREAL_REPO_URL = "${DREAL_REPO_URL}"
     DREAL_COMMIT_TAG = "${DREAL_COMMIT_TAG}"
   }
   dockerfile = "Dockerfile.dreal4"
-  tags = tag("funman-dreal4", "", "${DREAL_COMMIT_TAG}")
+  tags = tag("funman-dreal4", "", "")
 }
 
 target "funman-base" {
   context = "./docker/base"
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}-${DREAL_COMMIT_TAG}" = "target:funman-dreal4"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}" = "target:funman-dreal4"
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
-    DREAL_TAG = "${VERSION}-${DREAL_COMMIT_TAG}"
+    DREAL_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
     AUTOMATES_COMMIT_TAG = "${AUTOMATES_COMMIT_TAG}"
   }
   dockerfile = "Dockerfile"
-  tags = tag("funman-base", "", "${AUTOMATES_COMMIT_TAG}")
+  tags = tag("funman-base", "", "")
 }
 
 target "funman-pypi" {
   context = "./docker/pypi"
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}-${AUTOMATES_COMMIT_TAG}" = "target:funman-base"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}" = "target:funman-base"
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
-    FROM_TAG = "${VERSION}-${AUTOMATES_COMMIT_TAG}"
+    FROM_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
   }
   dockerfile = "Dockerfile"
   tags = tag("funman-pypi", "", "")
@@ -129,25 +134,29 @@ target "funman-pypi" {
 target "funman-git" {
   context = "."
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}-${AUTOMATES_COMMIT_TAG}" = "target:funman-base"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}" = "target:funman-base"
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
-    FROM_TAG = "${VERSION}-${AUTOMATES_COMMIT_TAG}"
+    FROM_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
   }
   dockerfile = "./docker/git/Dockerfile"
-  tags = tag("funman-git", "", "git")
+  tags = tag("funman-git", "", "")
 }
 
 target "funman-api" {
   context = "./docker/api"
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}-git" = "target:funman-git"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}" = "target:funman-git"
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
     FROM_IMAGE = "funman-git"
-    FROM_TAG = "${VERSION}-git"
+    FROM_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
   }
   dockerfile = "Dockerfile"
   tags = tag("funman-api", "", "")
@@ -156,17 +165,19 @@ target "funman-api" {
 target "funman-dev" {
   context = "."
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}-${DREAL_COMMIT_TAG}" = "target:funman-dreal4"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}" = "target:funman-dreal4"
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
-    DREAL_TAG = "${VERSION}-${DREAL_COMMIT_TAG}"
+    DREAL_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
     UNAME = "${FUNMAN_DEV_UNAME}"
     UID = "${FUNMAN_DEV_UID}"
     GID = "${FUNMAN_DEV_GID}"
   }
   dockerfile = "./docker/dev/user/Dockerfile"
-  tags = tag("funman-dev", "", "latest")
+  tags = tag("funman-dev", "", "")
 }
 
 target "funman-dev-as-root" {
@@ -176,10 +187,12 @@ target "funman-dev-as-root" {
   }
   args = {
     SIFT_REGISTRY_ROOT = "${DOCKER_REGISTRY}/${DOCKER_ORG}/"
-    DREAL_TAG = "${VERSION}-${DREAL_COMMIT_TAG}"
+    DREAL_TAG = "${VERSION}"
+    TARGETOS = "${TARGET_OS}"
+    TARGETARCH = "${TARGET_ARCH}"
   }
   dockerfile = "./docker/dev/root/Dockerfile.root"
-  tags = tag("funman-dev", "", "latest")
+  tags = tag("funman-dev", "", "")
 }
 
 target "funman-ibex-multiplatform" {
@@ -188,24 +201,24 @@ target "funman-ibex-multiplatform" {
 target "funman-dreal4-multiplatform" {
   inherits = ["_platforms", "funman-dreal4"]
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}-${IBEX_BRANCH}" = "target:funman-ibex-multiplatform"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-ibex:${VERSION}" = "target:funman-ibex-multiplatform"
   }
 }
 target "funman-base-multiplatform" {
   inherits = ["_platforms", "funman-base"]
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}-${DREAL_COMMIT_TAG}" = "target:funman-dreal4-multiplatform"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-dreal4:${VERSION}" = "target:funman-dreal4-multiplatform"
   }
 }
 target "funman-git-multiplatform" {
   inherits = ["_platforms", "funman-git"]
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}-${AUTOMATES_COMMIT_TAG}" = "target:funman-base-multiplatform"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-base:${VERSION}" = "target:funman-base-multiplatform"
   }
 }
 target "funman-api-multiplatform" {
   inherits = ["_platforms", "funman-api"]
   contexts = {
-    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}-git" = "target:funman-git-multiplatform"
+    "${DOCKER_REGISTRY}/${DOCKER_ORG}/funman-git:${VERSION}" = "target:funman-git-multiplatform"
   }
 }

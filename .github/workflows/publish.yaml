@@ -63,7 +63,7 @@ jobs:
         with:
           files: |
             ./docker/docker-bake.hcl
-          targets: funman-api-multiplatform
+          targets: funman-api
           push: true
           set: |
             *.cache-from=type=gha
